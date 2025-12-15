@@ -108,15 +108,15 @@
             <div>
                 <label for="discountLevel" style="font-weight: bold; margin-right: 15px;">請選擇本次訂單的折扣級別:</label>
                 <select id="discountLevel" onchange="calculateTotals()" style="padding: 8px; border-radius: 4px;">
-                    <option value="0.15">15% 折扣</option>
-                    <option value="0.25" selected>25% 折扣</option>
+                    <option value="0.15" selected>15% 折扣</option> 
+                    <option value="0.25">25% 折扣</option>
                     <option value="0.35">35% 折扣</option>
                     <option value="0.42">42% 折扣</option>
                     <option value="0.50">50% 折扣</option>
                 </select>
             </div>
             <div style="font-weight: bold; color: #dc3545; display: flex; align-items: center;">
-                固定運費: HK$ 30.00
+                運費: HK$ 30.00
                 <button id="toggleShippingBtn" onclick="toggleShipping()" style="margin-left: 15px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; background-color: #f0ad4e; color: white;">不加入運費</button>
             </div>
         </div>
@@ -173,7 +173,7 @@
                 <span id="sum-totalRetail" class="value">HK$ 0.00</span>
             </div>
             <div class="summary-item" style="font-size: 18px; background: #ffebee;">
-                <span class="label">總折扣金額 (基於收入基數計算)</span>
+                <span class="label">總折扣金額 (<span id="discount-display">25%</span>, **基於總收入基數計算**)</span>
                 <span id="sum-discountAmount" class="value" style="color: #dc3545;">- HK$ 0.00</span>
             </div>
             <div class="summary-item">
@@ -190,10 +190,10 @@
     <script>
         const SHIPPING_FEE = 30.00; // 港幣運費 $30.00
         const QUICK_FILL_SKUS = ['0141', '0006', '0102', '0242']; // 快速輸入清單
-        let isShippingIncluded = true; // 運費狀態變數
+        let isShippingIncluded = true; // 運費狀態變數 (預設加入)
 
         // ==========================================================
-        //  產品資料庫：已整合您提供的所有數據 
+        //  產品資料庫 (與您提供的數據一致)
         // ==========================================================
         const productDatabase = {
             '0006': { name: '濃縮蘆薈汁 Herbal Aloe Concentrate', vp: 24.95, earnBase: 401.00, literature: 0.00, retail: 439.00 },
@@ -261,7 +261,7 @@
             '006K': { name: '一口蛋白棒 - 鹽味焦糖脆脆 Protein Bites - Crunchy Salted Caramel', vp: 9.24, earnBase: 141.00, literature: 0.00, retail: 252.00 },
             '1927': { name: '營養蛋白素 - 紅豆薏仁 Formula 1 Nutritional Protein Drink Mix - Red Bean', vp: 23.95, earnBase: 418.00, literature: 0.00, retail: 457.00 },
             
-            // 非產品/費用項目 (VP/Earn Base = 0, Literature Price = Retail Price)
+            // 非產品/費用項目 (VP/Earn Base = 0)
             '0909': { name: '會籍服務年費 - 領班 Annual Membership Services Fee - Supervisor', vp: 0.00, earnBase: 0.00, literature: 613.00, retail: 613.00 },
             '5092': { name: '中、英雙語零售訂購單 Retail Order Form Pad', vp: 0.00, earnBase: 0.00, literature: 46.00, retail: 46.00 },
             '9909': { name: '會籍服務年費 - 會員 Annual Membership Services Fee - Member', vp: 0.00, earnBase: 0.00, literature: 92.00, retail: 92.00 },
@@ -280,7 +280,7 @@
             calculateTotals();
         });
 
-        // --- 運費開關控制 ---
+        // --- 運費開關控制 (已新增) ---
         function toggleShipping() {
             isShippingIncluded = !isShippingIncluded;
             const btn = document.getElementById('toggleShippingBtn');
@@ -302,7 +302,6 @@
             const row = inputElement.closest('tr');
             const product = productDatabase[sku];
 
-            // 獲取該行所有自動填充的欄位
             const productName = row.cells[3].querySelector('input');
             const vp = row.cells[4].querySelector('[data-field="vp"]');
             const earnBase = row.cells[5].querySelector('[data-field="earnBase"]');
@@ -325,7 +324,7 @@
                 retailPrice.value = 0;
             }
 
-            calculateTotals(); // 重新計算總計
+            calculateTotals(); 
         }
 
         // --- 產品名稱搜尋功能 ---
@@ -388,7 +387,7 @@
                 <td><input type="number" class="read-only" readonly value="0" data-field="literaturePrice"></td>
                 <td><input type="number" class="read-only" readonly value="0" data-field="retailPrice"></td>
             `;
-            // 如果 SKU 不為空，則立即進行查找以填充數據
+            
             if (sku) {
                 const skuInput = newRow.cells[1].querySelector('.sku-input');
                 lookupProduct(skuInput);
@@ -400,12 +399,9 @@
         // --- 快速輸入功能 ---
         function quickFill() {
             const tableBody = document.querySelector('#productTable tbody');
-            // 1. 清空現有的產品行
             tableBody.innerHTML = '';
             
-            // 2. 循環添加指定的 SKU
             QUICK_FILL_SKUS.forEach(sku => {
-                // 必須將 SKU 轉換為大寫以匹配 lookupProduct 的邏輯
                 addRow(sku.toUpperCase(), 1); 
             });
 
@@ -419,13 +415,12 @@
         }
 
 
-        // --- 總計算函數 ---
+        // --- 核心總計算函數 (已更新邏輯) ---
         function calculateTotals() {
             const rows = document.querySelectorAll('#productTable tbody tr');
             let totalVP = 0;
             let totalEarnBase = 0;
-            let overallTotalRetail = 0; // 總零售價格 (所有產品的 Retail * Qty)
-            let totalDiscountAmount = 0; // 總折扣金額 (Earn Base * Discount * Qty)
+            let overallTotalRetail = 0; // 所有產品的零售總價
             
             const discountLevelElement = document.getElementById('discountLevel');
             const discountFactor = parseFloat(discountLevelElement.value); 
@@ -437,29 +432,24 @@
                 const earnBase = parseFloat(row.cells[5].querySelector('[data-field="earnBase"]').value) || 0;
                 const retailPrice = parseFloat(row.cells[7].querySelector('[data-field="retailPrice"]').value) || 0;
 
-                // 累加點數/基數
+                // 累加所有總計
                 totalVP += vp * qty;
                 totalEarnBase += earnBase * qty;
-                
-                // 累加總零售價格
                 overallTotalRetail += retailPrice * qty;
-
-                // 根據會員價格計算公式計算總折扣金額 (只對有 Earn Base 的產品計算)
-                if (earnBase > 0) {
-                    const itemDiscount = earnBase * discountFactor * qty;
-                    totalDiscountAmount += itemDiscount;
-                }
             });
+            
+            // 根據新公式計算總折扣金額: 總收入基數 x 折扣率
+            const totalDiscountAmount = totalEarnBase * discountFactor;
 
-            // 最終折扣後的總價 (總零售價 - 總折扣金額)
-            const finalRetailTotal = overallTotalRetail - totalDiscountAmount;
+            // 最終客戶應付產品總價 (會員價): 總零售價 - 總折扣金額
+            const finalProductTotal = overallTotalRetail - totalDiscountAmount;
 
             // 運費處理
             const appliedShippingFee = isShippingIncluded ? SHIPPING_FEE : 0.00;
             const shippingDisplay = isShippingIncluded ? `HK$ ${SHIPPING_FEE.toFixed(2)}` : `HK$ 0.00 (不加入)`;
             
-            // 應收總金額 (含運費)
-            const totalAmountDue = finalRetailTotal + appliedShippingFee;
+            // 應收總金額 (產品總價 + 運費)
+            const totalAmountDue = finalProductTotal + appliedShippingFee;
 
             // --- 更新總結區塊 ---
             document.getElementById('sum-vp').textContent = totalVP.toFixed(2);
