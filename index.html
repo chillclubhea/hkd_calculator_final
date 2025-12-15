@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>產品分級折扣與點數計算工具 (HKD - 會員價)</title>
     <style>
+        /* 基本樣式 */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f7f6;
@@ -24,10 +25,21 @@
             text-align: center;
             margin-bottom: 20px;
         }
+        
+        /* 表格容器 - 讓表格可以在小屏上水平滾動 */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch; 
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            min-width: 800px; 
         }
         th, td {
             border: 1px solid #ddd;
@@ -88,7 +100,7 @@
         }
         .total-due {
             margin-top: 15px;
-            background-color: #dc3545; /* 最終總價使用紅色強調 */
+            background-color: #dc3545; 
             color: white;
             padding: 12px;
             border-radius: 4px;
@@ -114,6 +126,86 @@
             color: white;
             border-color: #0056b3;
         }
+        
+        /* --- 響應式媒體查詢開始 --- */
+
+        /* 平板設備 (768px - 1024px) */
+        @media screen and (max-width: 1024px) {
+            .container { padding: 15px; }
+            table { font-size: 12px; }
+            th, td { padding: 6px; }
+            .sku-input, .qty-input { width: 95%; }
+        }
+
+        /* 移动设备 (小于768px) */
+        @media screen and (max-width: 768px) {
+            .container { padding: 10px; }
+            
+            /* 隱藏次要列 (VP & Earn Base) 以節省空間 */
+            table th:nth-child(5), 
+            table td:nth-child(5),
+            table th:nth-child(6), 
+            table td:nth-child(6) {
+                display: none;
+            }
+            
+            /* 調整按鈕佈局 */
+            .add-btn, .quick-input-btn, .print-btn {
+                width: 100%;
+                margin: 5px 0;
+                float: none;
+                box-sizing: border-box;
+            }
+            
+            /* 調整客戶身份選擇按鈕為全寬堆疊 */
+            .client-type-btn {
+                width: 100%; 
+                margin: 5px 0 5px 0; /* Adjust margin for stacking */
+                padding: 10px 5px;
+                font-size: 14px;
+                box-sizing: border-box;
+            }
+            
+            /* 調整搜尋和選擇區域佈局 */
+            #productNameSearch {
+                width: 100%;
+                box-sizing: border-box;
+            }
+            .add-btn[onclick="performSearch()"] {
+                width: 100%;
+                margin: 5px 0;
+            }
+            
+            /* 移動設備輸入優化 (防止iOS自動縮放) */
+            .sku-input, .qty-input {
+                font-size: 16px; 
+                padding: 8px;
+                width: 100%;
+            }
+            
+            /* 优化总结区域在移动设备上的显示 */
+            .summary-box {
+                padding: 15px;
+            }
+            
+            .summary-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .summary-item .value {
+                margin-top: 5px;
+                align-self: flex-end;
+            }
+
+            /* 確保折扣下拉選單全寬 */
+            #discountLevel {
+                width: 100%;
+                box-sizing: border-box;
+                margin-top: 5px;
+            }
+        }
+        /* --- 響應式媒體查詢結束 --- */
     </style>
 </head>
 <body>
@@ -122,33 +214,39 @@
         <h1>產品分級折扣與點數計算工具 (HKD 港幣)</h1>
 
         <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-            <div style="margin-bottom: 15px;">
+            <div style="margin-bottom: 15px; text-align: center;">
                 <label style="font-weight: bold; margin-right: 15px;">👤 請選擇客戶身份:</label>
-                <button class="client-type-btn active" id="btn-distributor" onclick="setClientType('distributor')">直銷商 (Distributor)</button>
-                <button class="client-type-btn" id="btn-pc" onclick="setClientType('pc')">優惠客戶 (Preferred Customer)</button>
+                <div style="margin-top: 10px; display: flex; justify-content: space-between; flex-wrap: wrap;">
+                    <button class="client-type-btn active" id="btn-distributor" onclick="setClientType('distributor')">直銷商 (Distributor)</button>
+                    <button class="client-type-btn" id="btn-pc" onclick="setClientType('pc')">優惠客戶 (PC)</button>
+                    <button class="client-type-btn" id="btn-retail" onclick="setClientType('retail')">零售客 (Retail) - 原價</button>
+                </div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <label for="discountLevel" style="font-weight: bold; margin-right: 15px;">🔖 請選擇本次訂單的折扣級別:</label>
-                    <select id="discountLevel" onchange="calculateTotals()" style="padding: 8px; border-radius: 4px;">
-                        <option value="0.15" selected>15% 折扣</option> 
-                        <option value="0.25">25% 折扣</option>
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                <div style="width: 100%;">
+                    <label for="discountLevel" style="font-weight: bold; margin-right: 15px; display: block; margin-bottom: 5px;">🔖 請選擇本次訂單的折扣級別:</label>
+                    <select id="discountLevel" onchange="calculateTotals()" style="padding: 8px; border-radius: 4px; width: 100%;">
+                        <option value="0.15">15% 折扣</option> 
+                        <option value="0.25" selected>25% 折扣</option>
                         <option value="0.35">35% 折扣</option>
                         <option value="0.42">42% 折扣</option>
                         <option value="0.50">50% 折扣</option>
+                        <option value="0.00" disabled style="display: none;">0% 折扣 (零售客)</option>
                     </select>
                 </div>
-                <div id="shipping-rule-display" style="font-weight: bold; color: #dc3545;">
+                <div id="shipping-rule-display" style="font-weight: bold; color: #dc3545; margin-top: 15px;">
                     運費規則: 訂單零售總價 HK$ 4,000.00 以下，運費 HK$ 30.00
                 </div>
             </div>
         </div>
         
         <div style="margin-bottom: 20px; padding: 15px; background: #e6f7ff; border-radius: 6px;">
-            <label for="productNameSearch" style="font-weight: bold; margin-right: 15px;">🔍 產品名稱搜尋:</label>
-            <input type="text" id="productNameSearch" placeholder="輸入產品名稱關鍵字 (至少 2 個字)" style="padding: 6px; width: 300px;">
-            <button class="add-btn" style="float: none; margin-left: 10px; background-color: #007bff;" onclick="performSearch()">搜尋</button>
+            <label for="productNameSearch" style="font-weight: bold; margin-right: 15px; display: block; margin-bottom: 5px;">🔍 產品名稱搜尋:</label>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <input type="text" id="productNameSearch" placeholder="輸入產品名稱關鍵字 (至少 2 個字)" style="padding: 6px; flex-grow: 1; box-sizing: border-box;">
+                <button class="add-btn" style="float: none; background-color: #007bff; width: auto;" onclick="performSearch()">搜尋</button>
+            </div>
             <div id="searchResults" style="margin-top: 10px; display: none;">
                 </div>
         </div>
@@ -160,26 +258,28 @@
             <div style="clear: both;"></div>
         </div>
         
-        <table id="productTable">
-            <thead>
-                <tr>
-                    <th rowspan="2">操作</th>
-                    <th rowspan="2">產品編號 (SKU)</th>
-                    <th rowspan="2">數量 (Qty)</th>
-                    <th rowspan="2">產品名稱</th>
-                    <th colspan="2">積點/基數</th>
-                    <th colspan="2">價格 (HK$)</th>
-                </tr>
-                <tr>
-                    <th>銷售量點數 (VP)</th>
-                    <th>收入基數 (Earn Base)</th>
-                    <th>輔銷品價格 (Literature Price)</th>
-                    <th>零售價格 (Retail)</th>
-                </tr>
-            </thead>
-            <tbody>
-                </tbody>
-        </table>
+        <div class="table-container">
+            <table id="productTable">
+                <thead>
+                    <tr>
+                        <th rowspan="2">操作</th>
+                        <th rowspan="2">產品編號 (SKU)</th>
+                        <th rowspan="2">數量 (Qty)</th>
+                        <th rowspan="2">產品名稱</th>
+                        <th colspan="2">積點/基數</th>
+                        <th colspan="2">價格 (HK$)</th>
+                    </tr>
+                    <tr>
+                        <th>銷售量點數 (VP)</th>
+                        <th>收入基數 (Earn Base)</th>
+                        <th>輔銷品價格 (Literature Price)</th>
+                        <th>零售價格 (Retail)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
 
         <div style="clear: both;"></div>
 
@@ -194,7 +294,7 @@
                 <span id="sum-earnBase" class="value">0.00</span>
             </div>
             <div class="summary-item">
-                <span class="label">總零售價格 (未折)</span>
+                <span class="label">總零售價格 (原價)</span>
                 <span id="sum-totalRetail" class="value" style="font-weight: bold;">HK$ 0.00</span>
             </div>
             <div class="summary-item" style="font-size: 18px; background: #ffebee;">
@@ -213,37 +313,100 @@
     </div>
 
     <script>
-        // 產品數據庫 (與您提供的數據一致，此處省略長列表以節省空間)
+        // --- 產品數據庫 (72 項產品) ---
         const productDatabase = {
-            '0006': { name: '濃縮蘆薈汁 Herbal Aloe Concentrate', vp: 24.95, earnBase: 401.00, literature: 0.00, retail: 439.00 },
-            '0022': { name: '五味子精華 Schizandra Plus', vp: 15.50, earnBase: 297.00, literature: 0.00, retail: 325.00 },
-            '0036': { name: '夜寧新營養飲品 Niteworks®', vp: 89.95, earnBase: 1490.00, literature: 0.00, retail: 1630.00 },
-            '0056': { name: '膠原蛋白美肌飲料 Beauty Powder Drink', vp: 43.55, earnBase: 865.00, literature: 0.00, retail: 946.00 },
-            '0102': { name: '天然瓜拉拿茶 N-R-G® Tea', vp: 14.75, earnBase: 291.00, literature: 0.00, retail: 318.00 },
-            '0141': { name: '營養蛋白素 - 雲呢拿 Nutritional Protein Drink Mix - Vanilla', vp: 23.95, earnBase: 418.00, literature: 0.00, retail: 457.00 },
-            '0242': { name: '佳能蛋白質粉 Performance Protein Powder', vp: 17.95, earnBase: 333.00, literature: 0.00, retail: 364.00 },
-            '0909': { name: '會籍服務年費 - 領班 Annual Membership Services Fee - Supervisor', vp: 0.00, earnBase: 0.00, literature: 613.00, retail: 613.00 },
-            '9943': { name: 'Bizworks 首次登記免2個月月費優惠 Bizworks 2-month Promotion for first time reg', vp: 0.00, earnBase: 0.00, literature: 0.00, retail: 0.00 },
-            // ... (請將完整的產品列表數據貼回此處)
+            '0036': { name: '夜寧新營養飲品 Niteworks®', vp: 89.95, earnBase: 1490.00, literature: 1209.00, retail: 1630.00 },
+            '1462': { name: '速備 24 Herbalife24 Prepare', vp: 73.10, earnBase: 1227.00, literature: 568.00, retail: 1342.00 },
+            '1417': { name: '健體 24 - 朱古力味 Herbalife24 Rebuild Strength - Chocolate', vp: 68.45, earnBase: 1028.00, literature: 234.00, retail: 1167.00 },
+            '1000': { name: '關捷寶 Joint Support', vp: 44.00, earnBase: 749.00, literature: 0.00, retail: 819.00 },
+            '0056': { name: '膠原蛋白美肌飲料 Beauty Powder Drink', vp: 43.55, earnBase: 865.00, literature: 702.00, retail: 946.00 },
+            '1457': { name: '營養蛋白素 24 - 雲呢拿味 Herbalife24 Formula 1 Sports - Creamy Vanilla', vp: 41.60, earnBase: 698.00, literature: 834.00, retail: 764.00 },
+            '0768': { name: '抗皺精華霜 Herbalife SKIN LINE MINIMIZING SERUM', vp: 37.70, earnBase: 629.00, literature: 511.00, retail: 688.00 },
+            '1061': { name: '女士之選 Woman\'s Choice', vp: 37.00, earnBase: 512.00, literature: 643.00, retail: 560.00 },
+            '0100': { name: '南極磷蝦油 Krill Shield®', vp: 35.50, earnBase: 570.00, literature: 476.00, retail: 624.00 },
+            '0106': { name: '即溶草本飲品102克 - 原味 Herbal Tea Concentrate 102g - Original', vp: 34.95, earnBase: 603.00, literature: 491.00, retail: 660.00 },
+            '0759': { name: '即溶草本飲品102克 - 蘋果甘菊味 Herbal Tea Concentrate 102g - Apple Chamomile', vp: 34.95, earnBase: 603.00, literature: 491.00, retail: 660.00 },
+            '0891': { name: '活養草本爽膚水 - 150 毫升 Herbalife SKIN ENERGIZING HERBAL TONER - 150ML', vp: 32.30, earnBase: 540.00, literature: 439.00, retail: 591.00 },
+            '0769': { name: '注顏修護日霜 Herbalife SKIN DAILY GLOW MOISTURIZER', vp: 28.40, earnBase: 474.00, literature: 385.00, retail: 519.00 },
+            '0774': { name: '修護晚霜 Herbalife SKIN REPLENISHING NIGHT CREAM', vp: 28.40, earnBase: 474.00, literature: 385.00, retail: 519.00 },
+            '0899': { name: '防曬日霜SPF30/PA+++ Protective Moisturizer SPF30/PA+++', vp: 28.40, earnBase: 474.00, literature: 385.00, retail: 519.00 },
+            '0770': { name: '盈亮緊緻眼部啫喱 Herbalife SKIN FIRMING EYE GEL', vp: 26.35, earnBase: 441.00, literature: 357.00, retail: 482.00 },
+            '0771': { name: '深層滋潤眼霜 Herbalife SKIN HYDRATING EYE CREAM', vp: 26.35, earnBase: 441.00, literature: 357.00, retail: 482.00 },
+            '011K': { name: '優質蛋白咖啡 - 朱古力咖啡 High Protein Iced Coffee - Mocha', vp: 25.95, earnBase: 437.00, literature: 67.00, retail: 478.00 },
+            '0065': { name: '深海魚油 Herbalifeline®', vp: 25.75, earnBase: 419.00, literature: 340.00, retail: 458.00 },
+            '0006': { name: '濃縮蘆薈汁 Herbal Aloe Concentrate', vp: 24.95, earnBase: 401.00, literature: 325.00, retail: 439.00 },
+            '1610': { name: '濃縮蘆薈汁(葡萄味) Herbal Aloe Concentrate - Grape Flavor', vp: 24.95, earnBase: 401.00, literature: 204.00, retail: 439.00 },
+            '0260': { name: '蛋白棒 - 檸檬 Protein Bar - CITRUS LEMON', vp: 7.70, earnBase: 114.00, literature: 94.00, retail: 207.00 },
+            '0378': { name: '日日滋養蘆薈潤膚露 Herbal Aloe Everyday Soothing Hand & Body Lotion', vp: 9.00, earnBase: 178.00, literature: 147.00, retail: 194.00 },
+            '0379': { name: '日日滋養蘆薈潤膚啫喱 Herbal Aloe Everyday Soothing Gel', vp: 9.00, earnBase: 178.00, literature: 147.00, retail: 194.00 },
+            '0493': { name: '日日潤膚蘆薈沐浴露 Herbal Aloe Everyday Body Wash', vp: 12.95, earnBase: 186.00, literature: 153.00, retail: 204.00 },
+            '2631': { name: '濃縮蘆薈汁(柑橘味) Herbal Aloe Concentrate - Mandarin Flavor', vp: 24.95, earnBase: 401.00, literature: 107.00, retail: 439.00 },
+            '1463': { name: 'H24 CR7 水健力 Herbalife24 CR7 DRIVE - ACAI', vp: 24.90, earnBase: 400.00, literature: 997.00, retail: 462.00 },
+            '0210': { name: '甲殼纖維素 Chitosan Fibre Complex', vp: 24.05, earnBase: 500.00, literature: 406.00, retail: 547.00 },
+            '0141': { name: '營養蛋白素 - 雲呢拿 Nutritional Protein Drink Mix - Vanilla', vp: 23.95, earnBase: 418.00, literature: 339.00, retail: 457.00 },
+            '0767': { name: '活養草本爽膚水 Herbalife SKIN ENERGIZING HERBAL TONER', vp: 12.70, earnBase: 208.00, literature: 172.00, retail: 228.00 },
+            '0142': { name: '營養蛋白素 - 朱古力 Nutritional Protein Drink Mix - Dutch Chocolate', vp: 23.95, earnBase: 418.00, literature: 339.00, retail: 457.00 },
+            '0143': { name: '營養蛋白素 - 野草莓 Nutritional Protein Drink Mix - Wild Berry', vp: 23.95, earnBase: 418.00, literature: 339.00, retail: 457.00 },
+            '0146': { name: '營養蛋白素 - 曲奇妙趣 Nutritional Protein Drink Mix - Cookies\'n Cream', vp: 23.95, earnBase: 418.00, literature: 339.00, retail: 457.00 },
+            '2774': { name: '營養蛋白素 - 鮮奶咖啡 Nutritional Protein Drink Mix - Café Latte', vp: 23.95, earnBase: 418.00, literature: 107.00, retail: 457.00 },
+            '0772': { name: '野莓磨砂乳 Herbalife SKIN INSTANT REVEAL BERRY SCRUB', vp: 13.10, earnBase: 214.00, literature: 177.00, retail: 234.00 },
+            '0773': { name: '深層潔淨薄荷面膜 Herbalife SKIN PURIFYING MINT CLAY MASK', vp: 14.20, earnBase: 234.00, literature: 194.00, retail: 256.00 },
+            '2789': { name: '營養蛋白素 - 薄荷朱古力 Nutritional Protein Drink Mix - Mint Chocolate', vp: 23.95, earnBase: 418.00, literature: 325.00, retail: 457.00 },
+            '0139': { name: '露思抗氧化精華 RoseGuard', vp: 23.75, earnBase: 383.00, literature: 311.00, retail: 419.00 },
+            '1405': { name: '補水24 Herbalife24 Hydrate', vp: 23.60, earnBase: 289.00, literature: 325.00, retail: 368.00 },
+            '0079': { name: '美纖片 Snack Defense', vp: 23.50, earnBase: 489.00, literature: 397.00, retail: 535.00 },
+            '2864': { name: '營養纖維粉(蘋果味) Active Fiber Complex (Apple Flavor)', vp: 22.95, earnBase: 377.00, literature: 339.00, retail: 413.00 },
+            '1065': { name: '濃縮蘆薈汁(芒果味) Herbal Aloe Concentrate Mango', vp: 24.95, earnBase: 395.00, literature: 416.00, retail: 432.00 },
+            '2865': { name: '營養纖維粉(原味) Active Fiber Complex (Original Flavor)', vp: 22.95, earnBase: 377.00, literature: 339.00, retail: 413.00 },
+            '072K': { name: '營養蛋白素─精選配方 Formula 1 Select Nutritional Protein Drink Mix -Natural Vanilla', vp: 21.65, earnBase: 420.00, literature: 460.00, retail: 460.00 }, 
+            '1829': { name: '益生菌 SIMPLY PROBIOTIC', vp: 20.45, earnBase: 337.00, literature: 325.00, retail: 369.00 },
+            '0257': { name: '即溶草本飲品50克 - 蜜桃味 Herbal Tea Concentrate 51g - Peach', vp: 19.95, earnBase: 341.00, literature: 278.00, retail: 373.00 },
+            '3115': { name: '多種維他命 F2 Multivitamin Complex', vp: 19.95, earnBase: 332.00, literature: 220.00, retail: 363.00 },
+            '0212': { name: '香蒜片 Mega Garlic Plus', vp: 18.95, earnBase: 250.00, literature: 203.00, retail: 273.00 },
+            '0242': { name: '佳能蛋白質粉 Performance Protein Powder', vp: 17.95, earnBase: 333.00, literature: 270.00, retail: 364.00 },
+            '0765': { name: '蘆薈舒緩潔面乳 (中至乾性肌膚) Herbalife SKIN SOOTHING ALOE CLEANSER (Normal to Dry)', vp: 16.75, earnBase: 282.00, literature: 228.00, retail: 308.00 },
+            '0766': { name: '閃亮柑橘潔面乳 (中至油性肌膚) Herbalife SKIN POLISHING CITRUS CLEANSER (Normal to Oily)', vp: 16.75, earnBase: 282.00, literature: 228.00, retail: 308.00 },
+            '2871': { name: 'Liftoff® 能量飲品 - 檸檬-青檸味 Liftoff® Effervescent Energy Drink - Lemon-Lime Blast', vp: 15.95, earnBase: 271.00, literature: 306.00, retail: 296.00 },
+            '2872': { name: 'Liftoff® 能量飲品 - 香橙味 Liftoff® Effervescent Energy Drink - Ignite-Me Orange', vp: 15.95, earnBase: 271.00, literature: 296.00, retail: 296.00 }, 
+            '0111': { name: '消脂片 Cell-U-Loss®', vp: 15.75, earnBase: 250.00, literature: 204.00, retail: 274.00 },
+            '0022': { name: '五味子精華 Schizandra Plus', vp: 15.50, earnBase: 297.00, literature: 270.00, retail: 325.00 },
+            '0130': { name: '抗脂片 Lipobond', vp: 15.40, earnBase: 330.00, literature: 267.00, retail: 361.00 },
+            '0102': { name: '天然瓜拉拿茶 N-R-G® Tea', vp: 14.75, earnBase: 291.00, literature: 237.00, retail: 318.00 },
+            '1579': { name: '莓之寶 Triple Berry Complex', vp: 13.25, earnBase: 250.00, literature: 325.00, retail: 274.00 },
+            '0565': { name: '複合鈣片 Xtra-Cal®', vp: 10.70, earnBase: 195.00, literature: 158.00, retail: 213.00 },
+            '145K': { name: '禦之寶 - 黑加侖子味 ImmuLift - Blackcurrant', vp: 10.00, earnBase: 175.00, literature: 0.00, retail: 191.00 },
+            '202K': { name: '鋅維思 - 天然香橙蜜糖味 Best Defense - Honey Orange', vp: 9.95, earnBase: 172.00, literature: 0.00, retail: 188.00 },
+            '111K': { name: 'Vitamin Mask – Moisturizing 維他命面膜 – 保濕', vp: 8.40, earnBase: 144.00, literature: 168.00, retail: 168.00 }, 
+            '2561': { name: '蘆薈滋潤淋浴露 Herbal Aloe Hand & Body Wash', vp: 8.30, earnBase: 131.00, literature: 275.00, retail: 143.00 },
+            '4974': { name: '營養蛋白素 - 芒果 Nutritional Protein Drink Mix - Fruity Mango', vp: 23.95, earnBase: 411.00, literature: 220.00, retail: 449.00 },
+            '2562': { name: '蘆薈潤膚啫喱 Herbal Aloe Soothing Gel', vp: 8.30, earnBase: 131.00, literature: 143.00, retail: 143.00 }, 
+            '012K': { name: '優質蛋白咖啡 - 鮮奶咖啡味 High Protein Iced Coffee - Latte', vp: 25.95, earnBase: 430.00, literature: 67.00, retail: 470.00 },
+            '2563': { name: '蘆薈滋潤乳霜 Herbal Aloe Hand & Body Cream', vp: 8.30, earnBase: 131.00, literature: 143.00, retail: 143.00 }, 
+            '2564': { name: '日日強韌蘆薈洗髮露 HERBAL ALOE SHAMPOO', vp: 8.30, earnBase: 131.00, literature: 143.00, retail: 143.00 }, 
+            '112K': { name: 'Vitamin Mask – Brightening 維他命面膜 – 美白', vp: 15.55, earnBase: 259.00, literature: 283.00, retail: 283.00 }, 
+            '2565': { name: '日日強韌蘆薈護髮乳 HERBAL ALOE CONDITIONER', vp: 8.30, earnBase: 131.00, literature: 143.00, retail: 143.00 }, 
+            '163A': { name: '三天體驗套裝 3 Days Trail Pack', vp: 7.80, earnBase: 149.00, literature: 0.00, retail: 166.00 },
+            '0258': { name: '蛋白棒 - 雲呢拿杏仁 Protein Bar - VANILLA ALMOND', vp: 7.70, earnBase: 116.00, literature: 94.00, retail: 211.00 }
         };
         // ==========================================================
 
-        const FIXED_SHIPPING_FEE = 30.00; // 港幣固定運費
+        const FIXED_SHIPPING_FEE = 30.00; 
         const QUICK_FILL_SKUS = ['0141', '0006', '0102', '0242']; 
         
         // 運費規則閾值
         const SHIPPING_THRESHOLDS = {
-            'distributor': 4000.00, // 直銷商滿 $4000 免運
-            'pc': 2500.00           // 優惠客戶滿 $2500 免運
+            'distributor': 4000.00, 
+            'pc': 2500.00,          
+            'retail': 2500.00 // 新增：零售客運費門檻
         };
 
-        let currentClientType = 'distributor'; // 預設為直銷商
+        let currentClientType = 'distributor'; 
 
         // --- 初始化 ---
         document.addEventListener('DOMContentLoaded', () => {
             addRow(); 
             calculateTotals();
-            setClientType('distributor'); // 初始化顯示直銷商規則
+            setClientType('distributor'); 
         });
 
         // --- 設置客戶身份 ---
@@ -251,19 +414,37 @@
             currentClientType = type;
             const btnDistributor = document.getElementById('btn-distributor');
             const btnPC = document.getElementById('btn-pc');
+            const btnRetail = document.getElementById('btn-retail'); 
             const ruleDisplay = document.getElementById('shipping-rule-display');
             const clientTypeText = document.getElementById('client-type-text');
+            const discountSelect = document.getElementById('discountLevel');
             
-            if (type === 'distributor') {
-                btnDistributor.classList.add('active');
-                btnPC.classList.remove('active');
-                ruleDisplay.innerHTML = `運費規則: 直銷商訂單**零售總價 HK$ ${SHIPPING_THRESHOLDS.distributor.toFixed(2)} 以下**，運費 HK$ ${FIXED_SHIPPING_FEE.toFixed(2)}`;
-                clientTypeText.textContent = '直銷商';
+            // 處理按鈕激活狀態
+            btnDistributor.classList.toggle('active', type === 'distributor');
+            btnPC.classList.toggle('active', type === 'pc');
+            btnRetail.classList.toggle('active', type === 'retail');
+            
+            // 處理折扣選擇器狀態
+            if (type === 'retail') {
+                discountSelect.value = '0.00'; // 強制 0% 折扣 (原價)
+                discountSelect.disabled = true;
+                discountSelect.style.backgroundColor = '#f8d7da'; // 淺紅背景提示禁用
+                clientTypeText.textContent = '零售客';
+                ruleDisplay.innerHTML = `運費規則: 零售客訂單**零售總價 HK$ ${SHIPPING_THRESHOLDS.retail.toFixed(2)} 以下**，運費 HK$ ${FIXED_SHIPPING_FEE.toFixed(2)}`;
             } else {
-                btnPC.classList.add('active');
-                btnDistributor.classList.remove('active');
-                ruleDisplay.innerHTML = `運費規則: 優惠客戶訂單**零售總價 HK$ ${SHIPPING_THRESHOLDS.pc.toFixed(2)} 以下**，運費 HK$ ${FIXED_SHIPPING_FEE.toFixed(2)}`;
-                clientTypeText.textContent = '優惠客戶';
+                discountSelect.disabled = false;
+                discountSelect.style.backgroundColor = 'white'; 
+                if (type === 'distributor') {
+                    clientTypeText.textContent = '直銷商';
+                    ruleDisplay.innerHTML = `運費規則: 直銷商訂單**零售總價 HK$ ${SHIPPING_THRESHOLDS.distributor.toFixed(2)} 以下**，運費 HK$ ${FIXED_SHIPPING_FEE.toFixed(2)}`;
+                } else { // pc
+                    clientTypeText.textContent = '優惠客戶';
+                    ruleDisplay.innerHTML = `運費規則: 優惠客戶訂單**零售總價 HK$ ${SHIPPING_THRESHOLDS.pc.toFixed(2)} 以下**，運費 HK$ ${FIXED_SHIPPING_FEE.toFixed(2)}`;
+                }
+                // 如果之前為零售客，則將折扣重置為預設值
+                if (discountSelect.value === '0.00') {
+                    discountSelect.value = '0.25'; 
+                }
             }
 
             calculateTotals();
@@ -271,7 +452,8 @@
 
         // --- 核心查找函數 (SKU Lookup) ---
         function lookupProduct(inputElement) {
-            const sku = inputElement.value.toUpperCase().trim();
+            const sku = inputElement.value.toUpperCase().replace(/[^A-Z0-9]/g, '').trim(); 
+            inputElement.value = sku; 
             const row = inputElement.closest('tr');
             const product = productDatabase[sku];
 
@@ -282,14 +464,12 @@
             const retailPrice = row.cells[7].querySelector('[data-field="retailPrice"]');
 
             if (product) {
-                // 找到產品，自動填充資料
                 productName.value = product.name;
                 vp.value = product.vp;
                 earnBase.value = product.earnBase;
                 literaturePrice.value = product.literature;
                 retailPrice.value = product.retail;
             } else {
-                // 未找到產品，清空欄位
                 productName.value = '未找到';
                 vp.value = 0;
                 earnBase.value = 0;
@@ -299,9 +479,7 @@
             calculateTotals(); 
         }
 
-        // --- 產品名稱搜尋、新增行、移除行等功能與前一版保持一致 ---
-        // (省略 search, addRow, quickFill, removeRow 函數程式碼以保持簡潔)
-        // ...
+        // --- 輔助函數 (Add/Remove Row, Quick Fill, Search) ---
         function addRow(sku = '', qty = 1) {
             const tableBody = document.querySelector('#productTable tbody');
             const newRow = tableBody.insertRow();
@@ -346,7 +524,8 @@
             let found = false;
             for (const sku in productDatabase) {
                 const product = productDatabase[sku];
-                if (product.name.toUpperCase().includes(searchTerm)) {
+                // 搜尋產品名稱或 SKU
+                if (product.name.toUpperCase().includes(searchTerm) || sku.includes(searchTerm)) {
                     found = true;
                     const resultItem = document.createElement('div');
                     resultItem.innerHTML = `
@@ -371,16 +550,22 @@
             document.getElementById('searchResults').style.display = 'none';
             document.getElementById('productNameSearch').value = ''; 
         }
-
-        // --- 核心總計算函數 (含自動運費邏輯) ---
+        
+        // --- 核心總計算函數 ---
         function calculateTotals() {
             const rows = document.querySelectorAll('#productTable tbody tr');
             let totalVP = 0;
             let totalEarnBase = 0;
-            let overallTotalRetail = 0; // 核心：用於計算折扣和運費判定
+            let overallTotalRetail = 0; 
 
             const discountLevelElement = document.getElementById('discountLevel');
-            const discountFactor = parseFloat(discountLevelElement.value); 
+            let discountFactor = parseFloat(discountLevelElement.value); 
+            
+            // ** 零售客邏輯覆蓋 **
+            if (currentClientType === 'retail') {
+                discountFactor = 0.00; // 強制 0% 折扣
+            }
+
             const discountPercentage = (discountFactor * 100).toFixed(0) + '%'; 
 
             rows.forEach(row => {
@@ -397,7 +582,7 @@
             // 1. 計算總折扣金額: 總收入基數 x 折扣率
             const totalDiscountAmount = totalEarnBase * discountFactor;
 
-            // 2. 最終客戶應付產品總價 (會員價)
+            // 2. 最終客戶應付產品總價 (會員價/零售價)
             const finalProductTotal = overallTotalRetail - totalDiscountAmount;
 
             // 3. 運費自動判定
@@ -407,7 +592,7 @@
             if (overallTotalRetail > threshold) {
                 appliedShippingFee = 0.00; // 免運費
             } else if (overallTotalRetail === 0) {
-                 appliedShippingFee = 0.00; // 零訂單也免運 (避免空訂單顯示運費)
+                 appliedShippingFee = 0.00; // 零訂單也免運
             } else {
                 appliedShippingFee = FIXED_SHIPPING_FEE; // 收取運費
             }
@@ -419,43 +604,41 @@
             document.getElementById('sum-vp').textContent = totalVP.toFixed(2);
             document.getElementById('sum-earnBase').textContent = totalEarnBase.toFixed(2);
             document.getElementById('sum-totalRetail').textContent = `HK$ ${overallTotalRetail.toFixed(2)}`;
-            document.getElementById('sum-discountAmount').textContent = `- HK$ ${totalDiscountAmount.toFixed(2)}`;
-            document.getElementById('discount-display').textContent = discountPercentage;
-            document.getElementById('sum-shipping').textContent = `HK$ ${appliedShippingFee.toFixed(2)} (${overallTotalRetail > threshold ? '免運' : '收取'})`;
+            
+            // 根據是否為零售客調整折扣顯示
+            const discountDisplay = document.getElementById('discount-display');
+            if (currentClientType === 'retail') {
+                discountDisplay.textContent = '0%';
+                document.getElementById('sum-discountAmount').textContent = `- HK$ 0.00 (原價)`;
+            } else {
+                discountDisplay.textContent = discountPercentage;
+                document.getElementById('sum-discountAmount').textContent = `- HK$ ${totalDiscountAmount.toFixed(2)}`;
+            }
+
+            document.getElementById('sum-shipping').textContent = `HK$ ${appliedShippingFee.toFixed(2)} (${overallTotalRetail > 0 && overallTotalRetail > threshold ? '免運' : overallTotalRetail > 0 ? '收取' : '---'})`;
             document.getElementById('sum-totalDue').textContent = `HK$ ${totalAmountDue.toFixed(2)}`;
         }
 
 
-        // --- 生成列印用訂單表功能 (已新增) ---
+        // --- 生成列印用訂單表功能 ---
         function generatePrintOrder() {
             const tableBody = document.querySelector('#productTable tbody');
             const rows = tableBody.querySelectorAll('tr');
             let orderItemsHtml = '';
-            let totalVP = 0;
-            let totalEarnBase = 0;
-            let overallTotalRetail = 0;
-            let totalDiscountAmount = 0;
-            let finalProductTotal = 0;
-            let appliedShippingFee = 0;
-            let totalAmountDue = 0;
-            const discountFactor = parseFloat(document.getElementById('discountLevel').value);
-            const discountPercentage = (discountFactor * 100).toFixed(0) + '%';
-
-            // 重新運行計算邏輯以確保數據最新
+            
             calculateTotals(); 
 
-            // 從 DOM 取得最終計算結果 (確保與主頁面一致)
-            totalVP = parseFloat(document.getElementById('sum-vp').textContent);
-            totalEarnBase = parseFloat(document.getElementById('sum-earnBase').textContent);
-            overallTotalRetail = parseFloat(document.getElementById('sum-totalRetail').textContent.replace('HK$', '').trim());
-            totalDiscountAmount = parseFloat(document.getElementById('sum-discountAmount').textContent.replace('- HK$', '').trim());
-            
-            // 由於運費顯示帶有文字，我們需要從計算結果中提取純數字
+            // 從 DOM 取得最終計算結果
+            const totalVP = parseFloat(document.getElementById('sum-vp').textContent);
+            const overallTotalRetail = parseFloat(document.getElementById('sum-totalRetail').textContent.replace('HK$', '').trim());
+            const totalDiscountAmountText = document.getElementById('sum-discountAmount').textContent.replace('- HK$', '').replace('(原價)', '').trim();
+            const totalDiscountAmount = parseFloat(totalDiscountAmountText);
             const shippingText = document.getElementById('sum-shipping').textContent;
-            appliedShippingFee = parseFloat(shippingText.split('(')[0].replace('HK$', '').trim());
-            
-            totalAmountDue = parseFloat(document.getElementById('sum-totalDue').textContent.replace('HK$', '').trim());
-            finalProductTotal = totalAmountDue - appliedShippingFee;
+            const appliedShippingFee = parseFloat(shippingText.split('(')[0].replace('HK$', '').trim());
+            const totalAmountDue = parseFloat(document.getElementById('sum-totalDue').textContent.replace('HK$', '').trim());
+            const finalProductTotal = totalAmountDue - appliedShippingFee;
+            const discountPercentage = document.getElementById('discount-display').textContent;
+            const clientTypeText = document.getElementById('client-type-text').textContent;
             
             // 建立訂單明細 HTML
             rows.forEach(row => {
@@ -469,7 +652,6 @@
                     const lineRetailTotal = retailPrice * qty;
                     const lineVP = vp * qty;
 
-                    // 確保產品名稱較長時能換行
                     orderItemsHtml += `
                         <tr>
                             <td>${sku}</td>
@@ -492,7 +674,7 @@
             const printWindowContent = `
                 <html>
                 <head>
-                    <title>訂單摘要 - ${document.getElementById('client-type-text').textContent} (${discountPercentage})</title>
+                    <title>訂單摘要 - ${clientTypeText} (${discountPercentage})</title>
                     <style>
                         body { font-family: 'Arial', sans-serif; margin: 30px; }
                         h2 { color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 5px; margin-bottom: 20px; }
@@ -505,10 +687,10 @@
                     </style>
                 </head>
                 <body>
-                    <h2>訂單摘要 (${document.getElementById('client-type-text').textContent} - ${discountPercentage} 折扣)</h2>
+                    <h2>訂單摘要 (${clientTypeText} - ${discountPercentage} 折扣)</h2>
 
                     <div class="info-box">
-                        **會員價格計算公式**: 總零售價 - (總收入基數 × 折扣率)
+                        ${clientTypeText === '零售客' ? '**零售客計價公式**: 價格 Retail + 運費' : '**會員價格計算公式**: 價格 Retail - (收入基數 Earn Base × 折扣額 Discount%)'}
                         <br>
                         **運費規則**: ${document.getElementById('shipping-rule-display').textContent.replace('運費規則: ', '')}
                     </div>
@@ -539,11 +721,11 @@
                             <td style="text-align: right;">HK$ ${overallTotalRetail.toFixed(2)}</td>
                         </tr>
                         <tr>
-                            <td style="text-align: right; color: #dc3545;">總折扣金額 (${discountPercentage}):</td>
-                            <td style="text-align: right; color: #dc3545;">- HK$ ${totalDiscountAmount.toFixed(2)}</td>
+                            <td style="text-align: right; color: ${totalDiscountAmount > 0 ? '#dc3545' : '#000'};">總折扣金額 (${discountPercentage}):</td>
+                            <td style="text-align: right; color: ${totalDiscountAmount > 0 ? '#dc3545' : '#000'};">- HK$ ${totalDiscountAmount.toFixed(2)}</td>
                         </tr>
                         <tr>
-                            <td style="text-align: right; border-top: 1px solid #000;">淨產品金額 (會員價):</td>
+                            <td style="text-align: right; border-top: 1px solid #000;">淨產品金額 (${clientTypeText === '零售客' ? '原價' : '會員價'}):</td>
                             <td style="text-align: right; border-top: 1px solid #000; font-weight: bold;">HK$ ${finalProductTotal.toFixed(2)}</td>
                         </tr>
                         <tr>
@@ -564,7 +746,6 @@
             printWindow.document.write(printWindowContent);
             printWindow.document.close();
             printWindow.focus();
-            // printWindow.print(); // 可選：如果想自動彈出列印對話框
         }
     </script>
 
